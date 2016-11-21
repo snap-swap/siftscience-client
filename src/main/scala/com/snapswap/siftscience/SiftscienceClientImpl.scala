@@ -10,9 +10,10 @@ import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Sink, Source}
 import com.snapswap.siftscience.model._
-import com.snapswap.siftscience.retry.RetryConfig
+import com.snapswap.siftscience.retry.{ExponentialBackOff, RetryConfig}
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.control.NonFatal
 
 class SiftscienceClientImpl(apiKey: String,
                             retryConfig: RetryConfig,
@@ -25,7 +26,7 @@ class SiftscienceClientImpl(apiKey: String,
   import com.snapswap.siftscience.model.json._
 
   private val log = Logging(system, this.getClass)
-  private val baseURL = "v204/events"
+  private val baseURL = "/v204/events"
   private val connectionFlow =
     Http()
       .outgoingConnectionHttps("api.siftscience.com")
@@ -75,13 +76,37 @@ class SiftscienceClientImpl(apiKey: String,
     )
   }
 
-  private def delivery(data: Map[String, JsValue]): Future[Unit] = {
-//    system.scheduler.scheduleOnce(retryConfig.initialDelay) {
-//
-//    }
-    send[String](post(data)) { response =>
-      response
-    }.map(_ => ())
+  private def delivery(data: Map[String, JsValue], backOffCfg: Option[ExponentialBackOff] = None): Future[Unit] = {
+    send[Unit](post(data)) { _ => () }
+      .map(_ => ())
+      .recover {
+        case RetryableError(error) =>
+          log.warning(s"Can't send '$data' to Sift Science because '$error', attempt retry")
+
+          backOffCfg match {
+            case Some(cfg) =>
+              if (cfg.restartCount > retryConfig.maxAttempts) {
+                log.error(s"After '${retryConfig.maxAttempts} stop send retry")
+              } else {
+                val next = cfg.nextBackOff()
+
+                log.debug(s"Schedule resend event after '${next.calculateDelay.toSeconds}' seconds")
+                system.scheduler.scheduleOnce(next.calculateDelay) {
+                  delivery(data, Some(next))
+                }
+              }
+            case None =>
+              val cfg = ExponentialBackOff(retryConfig.minBackoff, retryConfig.maxBackoff, 0.1)
+
+              system.scheduler.scheduleOnce(cfg.calculateDelay) {
+                delivery(data, Some(cfg))
+              }
+          }
+        case FatalError(error) =>
+          log.error(s"Can't resend '${data.toJson.compactPrint}' to Sift Science because error code '${error.status.code}' with message '${error.errorMessage}'")
+        case NonFatal(ex) =>
+          log.error(ex, s"Can't resend '${data.toJson.compactPrint}' to Sift Science because '${ex.getMessage}'")
+      }
   }
 
   private def http(request: HttpRequest): Future[HttpResponse] =
@@ -109,12 +134,22 @@ class SiftscienceClientImpl(apiKey: String,
     http(request).flatMap { response =>
       Unmarshal(response.entity).to[String].map { asString =>
         if (response.status.isSuccess()) {
-          log.debug(s"SUCCESS ${request.method} ${request.uri} -> ${response.status} '$asString'")
+          log.debug(s"SUCCESS ${request.method} -> ${response.status} '$asString'")
           asString
         } else {
-          RetryableError
-          log.error(s"FAILURE ${request.method} ${request.uri} -> ${response.status} '$asString'")
-          null
+          if(asString.isEmpty) {
+            throw new RuntimeException(s"Unknown response: '$response'")
+          } else {
+            val error = asString.parseJson.convertTo[Error]
+
+            if (error.status.code < 0) {
+              log.error(s"FAILURE ${request.method} -> ${response.status} '$asString', attempt send request again")
+              throw RetryableError(error)
+            } else {
+              log.error(s"FAILURE ${request.method} -> ${response.status} '$asString'")
+              throw FatalError(error)
+            }
+          }
         }
       }
     }.map(handler)

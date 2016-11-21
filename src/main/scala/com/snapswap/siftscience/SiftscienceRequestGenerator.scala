@@ -7,9 +7,6 @@ private[siftscience] trait SiftscienceRequestGenerator {
   import com.snapswap.siftscience.model.json._
   import spray.json._
 
-  private val emptyJsArray = Seq.empty[String].toJson
-  private val emptyMap = Map.empty[String, JsValue]
-
   protected def accountCreatedRequest(common: RequestCommon,
                                       givenName: String,
                                       familyName: String,
@@ -23,7 +20,6 @@ private[siftscience] trait SiftscienceRequestGenerator {
       Map(
         "$name" -> s"$givenName $familyName".toJson,
         "$phone" -> phoneParam.toJson,
-        "$billing_address" -> emptyJsArray,
         "$referrer_user_id" -> inviter.toJson,
         "$promotions" -> promotionsParam.toJson,
         "$payment_methods" -> accounts.toJson

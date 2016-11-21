@@ -1,45 +1,31 @@
 package com.snapswap.siftscience.retry
 
+import java.util.concurrent.ThreadLocalRandom
+
 import scala.concurrent.duration.{Duration, FiniteDuration}
-import scala.util.Random
 
-case class ExponentialBackOff(slotTime: FiniteDuration,
-                              ceiling: Int = 10,
-                              stayAtCeiling: Boolean = false,
-                              slot: Int = 1,
-                              rand: Random = new Random(),
-                              waitTime: FiniteDuration = Duration.Zero,
-                              retries: Int = 0,
-                              resets: Int = 0,
-                              totalRetries: Long = 0) {
-  def isStarted(): Boolean = {
-    retries > 0
-  }
+case class ExponentialBackOff(protected val minBackoff: FiniteDuration,
+                              protected val maxBackoff: FiniteDuration,
+                              protected val randomFactor: Double,
+                              restartCount: Int = 0) {
+  require(minBackoff > Duration.Zero, "minBackoff must be > 0")
+  require(maxBackoff >= minBackoff, "maxBackoff must be >= minBackoff")
+  require(0.0 <= randomFactor && randomFactor <= 1.0, "randomFactor must be between 0.0 and 1.0")
 
-  def reset(): ExponentialBackOff = {
-    copy(slot = 1, waitTime = Duration.Zero, resets = resets + 1, retries = 0)
-  }
-
-  def nextBackOff: ExponentialBackOff = {
-    def time: FiniteDuration = slotTime * times
-
-    def times = {
-      val exp: Double = rand.nextInt(slot + 1).toDouble
-      math.round(math.pow(2, exp) - 1)
-    }
-
-    if (slot >= ceiling && !stayAtCeiling) {
-      reset()
+  def calculateDelay: FiniteDuration = {
+    val rnd = 1.0 + ThreadLocalRandom.current().nextDouble() * randomFactor
+    if (restartCount >= 30) {
+      // Duration overflow protection (> 100 years)
+      maxBackoff
     } else {
-      val (newSlot, newWait: FiniteDuration) = if (slot >= ceiling) {
-        (ceiling, time)
-      } else {
-        (slot + 1, time)
+      maxBackoff.min(minBackoff * math.pow(2, restartCount.toDouble)) * rnd match {
+        case f: FiniteDuration ⇒ f
+        case _ ⇒ maxBackoff
       }
-      copy(slot = newSlot,
-        waitTime = newWait,
-        retries = retries + 1,
-        totalRetries = totalRetries + 1)
     }
+  }
+
+  def nextBackOff(): ExponentialBackOff = {
+    copy(restartCount = restartCount + 1)
   }
 }

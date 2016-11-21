@@ -7,7 +7,7 @@ object ErrorCodeEnum extends Enumeration {
   val `Unexpected server-side error -2` = ErrorCode(-1, "Unexpected server-side error")
   val `Invalid API key` = ErrorCode(51, "Invalid API key")
   val `Invalid characters in field name` = ErrorCode(52, "Invalid characters in field name")
-  val `Invalid characters in field value` = ErrorCode(52, "Invalid characters in field value")
+  val `Invalid characters in field value` = ErrorCode(53, "Invalid characters in field value")
   val `Missing required field` = ErrorCode(55, "Missing required fieldvalue")
   val `Invalid JSON in request` = ErrorCode(57, "Invalid JSON in request")
   val `Rate limited` = ErrorCode(60, "Rate limited")
@@ -20,4 +20,10 @@ object ErrorCodeEnum extends Enumeration {
     }
   }
 
+  def withCode(code: Int): ErrorCodeEnum.ErrorCode = {
+    values
+      .find(_.asInstanceOf[ErrorCode].code == code)
+      .map(_.asInstanceOf[ErrorCode])
+      .getOrElse(throw new NoSuchElementException(s"Unknown error code '$code'"))
+  }
 }

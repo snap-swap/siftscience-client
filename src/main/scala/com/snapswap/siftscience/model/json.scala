@@ -1,5 +1,6 @@
 package com.snapswap.siftscience.model
 
+import com.snapswap.siftscience.model.ErrorCodeEnum.ErrorCode
 import spray.json.DefaultJsonProtocol
 
 object json extends DefaultJsonProtocol {
@@ -203,9 +204,9 @@ object json extends DefaultJsonProtocol {
     "$api_key",
     "$user_id",
     "$session_id",
-    "$account_state",
+    "account_state",
     "$ip",
-    "$time")
+    "time")
 
   implicit val PromotionFormat = jsonFormat(Promotion,
     "$promotion_id",
@@ -213,4 +214,16 @@ object json extends DefaultJsonProtocol {
     "$description",
     "$referrer_user_id",
     "$discount")
+
+  implicit val errorCodeFormat = new RootJsonFormat[ErrorCodeEnum.ErrorCode] {
+    override def read(json: JsValue): ErrorCode = {
+      ErrorCodeEnum.withCode(json.convertTo[Int])
+    }
+
+    override def write(obj: ErrorCode): JsValue = {
+      obj.code.toJson
+    }
+  }
+
+  implicit val errorFormat = jsonFormat(Error, "status", "error_message", "time", "request")
 }
