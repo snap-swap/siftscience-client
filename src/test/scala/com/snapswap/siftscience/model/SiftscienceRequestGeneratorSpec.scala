@@ -19,9 +19,9 @@ class SiftscienceRequestGeneratorSpec extends WordSpecLike with Matchers {
         "$api_key" -> "582ad99ce4b014f72ff13308".toJson
         "$user_id" -> "011111112".toJson
         "$session_id" -> "111111112".toJson
-        "$account_state" -> "newbie".toJson
+        "account_state" -> "newbie".toJson
         "$ip" -> "127.0.0.1".toJson
-        "$time" -> now.toJson
+        "time" -> now.toJson
       }
     }
 
@@ -108,7 +108,6 @@ class SiftscienceRequestGeneratorSpec extends WordSpecLike with Matchers {
         "$name" -> "Samantha Carter".toJson
         "$phone" -> "353209111111".toJson
         "$referrer_user_id" -> "S#INVITER".toJson
-        "$billing_address" -> Seq.empty[String].toJson
       }
 
       result should contain key "$promotions"
@@ -127,7 +126,7 @@ class SiftscienceRequestGeneratorSpec extends WordSpecLike with Matchers {
       result should contain {
         "$amount" -> 10000.toJson
         "$sender_user_id" -> "011111113".toJson
-        "$time" -> now.toJson
+        "time" -> now.toJson
       }
     }
 
@@ -138,7 +137,7 @@ class SiftscienceRequestGeneratorSpec extends WordSpecLike with Matchers {
       result should contain {
         "$amount" -> 10000.toJson
         "$recipient_user_id" -> "011111113".toJson
-        "$time" -> now.toJson
+        "time" -> now.toJson
       }
     }
 
