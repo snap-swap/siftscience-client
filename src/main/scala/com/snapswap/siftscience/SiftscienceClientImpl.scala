@@ -11,6 +11,7 @@ import akka.stream.Materializer
 import akka.stream.scaladsl.{Sink, Source}
 import com.snapswap.siftscience.model._
 import com.snapswap.siftscience.retry.{ExponentialBackOff, RetryConfig}
+import org.joda.time.{DateTime, DateTimeZone}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.control.NonFatal
@@ -33,7 +34,7 @@ class SiftscienceClientImpl(apiKey: String,
       .log("siftscience")
 
   override def accountCreated(profile: String,
-                              clientId: String,
+                              clientId: Option[String],
                               profileState: String,
                               givenName: String,
                               familyName: String,
@@ -41,8 +42,8 @@ class SiftscienceClientImpl(apiKey: String,
                               inviter: Option[String],
                               accounts: Seq[PaymentMethod],
                               promotions: Seq[Promotion],
-                              ip: String,
-                              time: Long): Future[Unit] = {
+                              ip: Option[String],
+                              time: Long = nowUTC()): Future[Unit] = {
     val common: RequestCommon = RequestCommon("$create_account", apiKey, profile, clientId, profileState, ip, time)
 
     delivery(
@@ -51,11 +52,11 @@ class SiftscienceClientImpl(apiKey: String,
   }
 
   override def updateAccount(profile: String,
-                             clientId: String,
+                             clientId: Option[String],
                              profileState: String,
-                             ip: String,
-                             time: Long,
-                             update: UpdateSiftAccount): Future[Unit] = {
+                             ip: Option[String],
+                             update: UpdateSiftAccount,
+                             time: Long = nowUTC()): Future[Unit] = {
     val common: RequestCommon = RequestCommon("$update_account", apiKey, profile, clientId, profileState, ip, time)
 
     delivery(
@@ -64,16 +65,21 @@ class SiftscienceClientImpl(apiKey: String,
   }
 
   override def transaction(profile: String,
-                           clientId: String,
+                           clientId: Option[String],
                            profileState: String,
-                           ip: String,
-                           time: Long,
-                           tx: Transaction): Future[Unit] = {
+                           ip: Option[String],
+                           tx: Transaction,
+                           time: Long = nowUTC()): Future[Unit] = {
     val common: RequestCommon = RequestCommon("$transaction", apiKey, profile, clientId, profileState, ip, time)
 
     delivery(
       transactionRequest(common, tx)
     )
+  }
+
+
+  override protected def nowUTC(): Long = {
+    new DateTime(DateTimeZone.UTC).getMillis
   }
 
   private def delivery(data: Map[String, JsValue], backOffCfg: Option[ExponentialBackOff] = None): Future[Unit] = {

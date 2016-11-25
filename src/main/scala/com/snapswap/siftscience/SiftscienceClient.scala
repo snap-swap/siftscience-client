@@ -6,7 +6,7 @@ import scala.concurrent.Future
 
 trait SiftscienceClient {
   def accountCreated(profile: String,
-                     clientId: String,
+                     clientId: Option[String],
                      profileState: String,
                      givenName: String,
                      familyName: String,
@@ -14,20 +14,22 @@ trait SiftscienceClient {
                      inviter: Option[String],
                      accounts: Seq[PaymentMethod],
                      promotions: Seq[Promotion],
-                     ip: String,
-                     time: Long): Future[Unit]
+                     ip: Option[String],
+                     time: Long = nowUTC()): Future[Unit]
 
   def updateAccount(profile: String,
-                    clientId: String,
+                    clientId: Option[String],
                     profileState: String,
-                    ip: String,
-                    time: Long,
-                    update: UpdateSiftAccount): Future[Unit]
+                    ip: Option[String],
+                    update: UpdateSiftAccount,
+                    time: Long = nowUTC()): Future[Unit]
 
   def transaction(profile: String,
-                  clientId: String,
+                  clientId: Option[String],
                   profileState: String,
-                  ip: String,
-                  time: Long,
-                  tx: Transaction): Future[Unit]
+                  ip: Option[String],
+                  tx: Transaction,
+                  time: Long = nowUTC()): Future[Unit]
+
+  protected def nowUTC(): Long
 }

@@ -16,7 +16,7 @@ object json extends DefaultJsonProtocol {
   implicit val MoneyFormat = new RootJsonFormat[Money] with ReadOnly[Money] {
     override def write(obj: Money): JsValue =
       JsObject(
-        "$amount" -> obj.micros().toJson,
+        "$amount" -> Micros.micros(obj.amount).toJson,
         "$currency_code" -> obj.ccy.toJson
       )
   }
@@ -118,11 +118,13 @@ object json extends DefaultJsonProtocol {
 
   implicit val bankDepositFormat = new RootJsonFormat[BankDeposit] with ReadOnly[BankDeposit] {
     override def write(obj: BankDeposit): JsValue = {
+      val micros = Micros.micros(obj.amount)
+
       JsObject(
         "$transaction_type" -> "$deposit".toJson,
         "$transaction_status" -> obj.status.toJson,
-        "$amount" -> obj.amount.micros().toJson,
-        "$currency_code" -> obj.amount.micros().toJson,
+        "$amount" -> micros.toJson,
+        "$currency_code" -> obj.ccy.toJson,
         "$order_id" -> obj.transferId.toJson,
         "$transaction_id" -> obj.transactionId.toJson,
         "$payment_method" -> UpdateBankAccount(obj.bankCode).toJson
@@ -131,11 +133,13 @@ object json extends DefaultJsonProtocol {
   }
   implicit val cardDepositFormat = new RootJsonFormat[CardDeposit] with ReadOnly[CardDeposit] {
     override def write(obj: CardDeposit): JsValue = {
+      val micros = Micros.micros(obj.amount)
+
       JsObject(
         "$transaction_type" -> "$deposit".toJson,
         "$transaction_status" -> obj.status.toJson,
-        "$amount" -> obj.amount.micros().toJson,
-        "$currency_code" -> obj.amount.micros().toJson,
+        "$amount" -> micros.toJson,
+        "$currency_code" -> obj.ccy.toJson,
         "$order_id" -> obj.transferId.toJson,
         "$transaction_id" -> obj.transactionId.toJson,
         "$payment_method" -> UpdateCardAccount(obj.bin, obj.last4).toJson
@@ -144,11 +148,13 @@ object json extends DefaultJsonProtocol {
   }
   implicit val bankwithdrawalformat = new RootJsonFormat[BankWithdrawal] with ReadOnly[BankWithdrawal] {
     override def write(obj: BankWithdrawal): JsValue = {
+      val micros = Micros.micros(obj.amount)
+
       JsObject(
         "$transaction_type" -> "$withdrawal".toJson,
         "$transaction_status" -> obj.status.toJson,
-        "$amount" -> obj.amount.micros().toJson,
-        "$currency_code" -> obj.amount.micros().toJson,
+        "$amount" -> micros.toJson,
+        "$currency_code" -> obj.ccy.toJson,
         "$order_id" -> obj.transferId.toJson,
         "$transaction_id" -> obj.transactionId.toJson,
         "$payment_method" -> UpdateBankAccount(obj.bankCode).toJson
@@ -157,11 +163,13 @@ object json extends DefaultJsonProtocol {
   }
   implicit val sendPaymentFormat = new RootJsonFormat[SendPayment] with ReadOnly[SendPayment] {
     override def write(obj: SendPayment): JsValue = {
+      val micros = Micros.micros(obj.amount)
+
       JsObject(
         "$transaction_type" -> "$transfer".toJson,
         "$transaction_status" -> obj.status.toJson,
-        "$amount" -> obj.amount.micros().toJson,
-        "$currency_code" -> obj.amount.micros().toJson,
+        "$amount" -> micros.toJson,
+        "$currency_code" -> obj.ccy.toJson,
         "$order_id" -> obj.transferId.toJson,
         "$transaction_id" -> obj.transactionId.toJson,
         "$recipient_user_id" -> obj.payeeId.toJson
@@ -170,11 +178,13 @@ object json extends DefaultJsonProtocol {
   }
   implicit val receivePaymentFormat = new RootJsonFormat[ReceivePayment] with ReadOnly[ReceivePayment] {
     override def write(obj: ReceivePayment): JsValue = {
+      val micros = Micros.micros(obj.amount)
+
       JsObject(
         "$transaction_type" -> "$transfer".toJson,
         "$transaction_status" -> obj.status.toJson,
-        "$amount" -> obj.amount.micros().toJson,
-        "$currency_code" -> obj.amount.micros().toJson,
+        "$amount" -> micros.toJson,
+        "$currency_code" -> obj.ccy.toJson,
         "$order_id" -> obj.transferId.toJson,
         "$transaction_id" -> obj.transactionId.toJson,
         "$sender_user_id" -> obj.payerId.toJson

@@ -120,7 +120,7 @@ class SiftscienceRequestGeneratorSpec extends WordSpecLike with Matchers {
     }
 
     "correct compose receiving a payment 'transaction' request" in new setup {
-      val tx = ReceivePayment("011111112", "transfer id", "transaction id", Money(0.01, "EUR"), "011111113")
+      val tx = ReceivePayment("transfer id", "transaction id", 0.01, "EUR", "011111113")
       val result: Map[String, JsValue] =  transactionRequest(common, tx)
 
       result should contain {
@@ -131,7 +131,7 @@ class SiftscienceRequestGeneratorSpec extends WordSpecLike with Matchers {
     }
 
     "correct compose sending a payment 'transaction' request" in new setup {
-      val tx = SendPayment("011111112", "transfer id", "transaction id", Money(0.01, "EUR"), "011111113")
+      val tx = SendPayment("transfer id", "transaction id", 0.01, "EUR", "011111113")
       val result: Map[String, JsValue] =  transactionRequest(common, tx)
 
       result should contain {
@@ -210,19 +210,19 @@ class SiftscienceRequestGeneratorSpec extends WordSpecLike with Matchers {
     val updateCardAccount: PaymentMethod = UpdateCardAccount("123456", "7890")
     val bankAccount: PaymentMethod = UpdateBankAccount("LU780030276335160000")
 
-    val bankDeposit = BankDeposit("011111112", "transfer id", "transaction id", Money(0.01, "EUR"), "011111113")
-    val cardDeposit = CardDeposit("011111112", "transfer id", "transaction id", Money(0.01, "EUR"), "123456", "7890")
-    val bankWithdrawal = BankWithdrawal("011111112", "transfer id", "transaction id", Money(0.01, "EUR"), "LU780030276335160000")
-    val receivePayment = ReceivePayment("011111112", "transfer id", "transaction id", Money(0.01, "EUR"), "011111113")
-    val sendPayment = SendPayment("011111112", "transfer id", "transaction id", Money(0.01, "EUR"), "011111113")
+    val bankDeposit = BankDeposit("transfer id", "transaction id", 0.01, "EUR", "011111113")
+    val cardDeposit = CardDeposit("transfer id", "transaction id", 0.01, "EUR", "123456", "7890")
+    val bankWithdrawal = BankWithdrawal("transfer id", "transaction id", 0.01, "EUR", "LU780030276335160000")
+    val receivePayment = ReceivePayment("transfer id", "transaction id", 0.01, "EUR", "011111113")
+    val sendPayment = SendPayment("transfer id", "transaction id", 0.01, "EUR", "011111113")
 
     val common = RequestCommon(
       `type` = "$create_account",
       apiKey = "582ad99ce4b014f72ff13308",
       userId = "011111112",
-      sessionId = "111111112",
+      sessionId = Some("111111112"),
       accountState = "newbie",
-      ip = "127.0.0.1",
+      ip = Some("127.0.0.1"),
       time = now)
   }
 

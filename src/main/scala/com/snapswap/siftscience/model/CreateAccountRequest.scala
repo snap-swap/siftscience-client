@@ -3,7 +3,7 @@ package com.snapswap.siftscience.model
 private[siftscience] case class RequestCommon(`type`: String,
                                               apiKey: String,
                                               userId: String,
-                                              sessionId: String,
+                                              sessionId: Option[String],
                                               accountState: String,
-                                              ip: String,
+                                              ip: Option[String],
                                               time: Long)
