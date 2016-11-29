@@ -102,7 +102,7 @@ class SiftscienceRequestGeneratorSpec extends WordSpecLike with Matchers {
     }
 
     "correct compose 'create account' request" in new setup {
-      val result: Map[String, JsValue] = accountCreatedRequest(common, "Samantha", "Carter", "353209111111", Some("S#INVITER"), Seq(bankAccount), Seq(promotion))
+      val result: Map[String, JsValue] = accountCreatedRequest(common, Some("Samantha"), Some("Carter"), "353209111111", Some("S#INVITER"), Seq(bankAccount), Seq(promotion))
 
       result should contain {
         "$name" -> "Samantha Carter".toJson
@@ -203,7 +203,7 @@ class SiftscienceRequestGeneratorSpec extends WordSpecLike with Matchers {
     val promotion = Promotion("GlonetaRegistrationBonus", "success", "Signup bonus for new Gloneta customers in 2016", "S#INVITER", Money(5, "USD"))
 
     val updateLuxtrust: UpdateSiftAccount = UpdateLuxtrust("Samantha", "Carter")
-    val updateIdData: UpdateSiftAccount = UpdateIdData("Samantha", "Carter")
+    val updateIdData: UpdateSiftAccount = UpdateIdData(Some("Samantha"), Some("Carter"))
     val updateEmail: UpdateSiftAccount = UpdateEmail("test@test.com")
     val updateAddress: UpdateSiftAccount = UpdateAddress("2100 Main Street", Some("Apt 3B"), "Luxemburg", None, "LU", "1623")
     val updateNickname: UpdateSiftAccount = UpdateNickname("johndoe")

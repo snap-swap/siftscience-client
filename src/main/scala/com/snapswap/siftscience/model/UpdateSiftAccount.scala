@@ -6,7 +6,7 @@ sealed trait PaymentMethod
 
 case class UpdateLuxtrust(givenName: String, familyName: String) extends UpdateSiftAccount
 
-case class UpdateIdData(givenName: String, familyName: String) extends UpdateSiftAccount
+case class UpdateIdData(givenName: Option[String], familyName: Option[String]) extends UpdateSiftAccount
 
 case class UpdateEmail(email: String) extends UpdateSiftAccount
 

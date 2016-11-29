@@ -8,8 +8,8 @@ private[siftscience] trait SiftscienceRequestGenerator {
   import spray.json._
 
   protected def accountCreatedRequest(common: RequestCommon,
-                                      givenName: String,
-                                      familyName: String,
+                                      givenName: Option[String],
+                                      familyName: Option[String],
                                       // parameter must be named 'phones', but "-Xfatal-warnings" force me to rename it to 'phoneParam'
                                       phoneParam: String,
                                       inviter: Option[String],
@@ -18,7 +18,7 @@ private[siftscience] trait SiftscienceRequestGenerator {
                                       promotionsParam: Seq[Promotion]): Map[String, JsValue] = {
     common.toJson.asJsObject.fields ++
       Map(
-        "$name" -> s"$givenName $familyName".toJson,
+        "$name" -> Seq(givenName, familyName).flatten.mkString(" ").toJson,
         "$phone" -> phoneParam.toJson,
         "$referrer_user_id" -> inviter.toJson,
         "$promotions" -> promotionsParam.toJson,

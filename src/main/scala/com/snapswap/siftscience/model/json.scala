@@ -32,7 +32,7 @@ object json extends DefaultJsonProtocol {
   implicit val updateIdDataFormat = new RootJsonFormat[UpdateIdData] with ReadOnly[UpdateIdData] {
     override def write(obj: UpdateIdData): JsValue = {
       JsObject(
-        "$name" -> s"${obj.givenName} ${obj.familyName}".toJson
+        "$name" -> Seq(obj.givenName, obj.familyName).flatten.mkString(" ").toJson
       )
     }
   }
