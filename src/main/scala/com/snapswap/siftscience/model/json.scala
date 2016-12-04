@@ -3,17 +3,84 @@ package com.snapswap.siftscience.model
 import com.snapswap.siftscience.model.ErrorCodeEnum.ErrorCode
 import spray.json.DefaultJsonProtocol
 
+
 object json extends DefaultJsonProtocol {
 
   import spray.json._
+  import com.snapswap.siftscience.utils.JsonHelper._
 
-  sealed trait ReadOnly[T] {
+  sealed trait WriteOnly[T] {
     def read(json: JsValue): T = {
-      deserializationError(s"read only")
+      deserializationError(s"write only")
     }
   }
 
-  implicit val MoneyFormat = new RootJsonFormat[Money] with ReadOnly[Money] {
+
+  implicit val AbuseDetailSeqFormat = new RootJsonReader[Seq[AbuseDetail]] {
+    override def read(json: JsValue): Seq[AbuseDetail] = {
+
+      val reasons = json match {
+        case JsArray(r) =>
+          r
+        case other =>
+          deserializationError(s"Expected array but got: ${other.prettyPrint}")
+      }
+
+      reasons.map { r =>
+        val name = (r / "name").convertTo[String]
+        val value = (r / "value").convertTo[String]
+        val details = (r / "details").map(_.prettyPrint)
+
+        (name, value, details) match {
+          case (Some(n), Some(v), d) =>
+            AbuseDetail(n, v, d)
+          case _ =>
+            deserializationError(s"Can't deserialize to AbuseDetail: ${r.prettyPrint}")
+        }
+      }
+
+    }
+  }
+
+  implicit val AbuseSeqFormat = new RootJsonReader[Seq[Abuse]] {
+    override def read(json: JsValue): Seq[Abuse] = {
+
+      json.asJsObject.fields.toSeq.map { case (name, abuse) =>
+        val score = (abuse / "score").convertTo[BigDecimal]
+        val detail = (abuse / "reasons").convertTo[Seq[AbuseDetail]].getOrElse(Seq.empty)
+
+        (name, score, detail) match {
+          case (n, Some(s), d) =>
+            Abuse(n, s, d)
+          case _ =>
+            deserializationError(s"Can't deserialize to Abuse: ${json.prettyPrint}")
+        }
+      }
+
+    }
+  }
+
+  implicit val ResponseFormat = new RootJsonReader[Response] {
+    override def read(json: JsValue): Response = {
+
+      val timestamp = (json / "time").convertTo[Long]
+      val userId = (json / "score_response" / "user_id").convertTo[String]
+      val errorCode = (json / "status").convertTo[Int]
+      val errorMessages = (json / "error_message").convertTo[String]
+      val abuses = (json / "score_response" / "scores").convertTo[Seq[Abuse]]
+
+      (timestamp, userId, abuses, errorCode, errorMessages) match {
+        case (Some(t), Some(u), Some(a), Some(err), Some(msg)) if a.nonEmpty =>
+          Response(t, u, a, err, msg)
+        case _ =>
+          deserializationError(s"Can't deserialize to Response: ${json.prettyPrint}")
+      }
+
+    }
+  }
+
+
+  implicit val MoneyFormat = new RootJsonFormat[Money] with WriteOnly[Money] {
     override def write(obj: Money): JsValue =
       JsObject(
         "$amount" -> Micros.micros(obj.amount).toJson,
@@ -21,7 +88,7 @@ object json extends DefaultJsonProtocol {
       )
   }
 
-  implicit val updateLuxtrustFormat = new RootJsonFormat[UpdateLuxtrust] with ReadOnly[UpdateLuxtrust] {
+  implicit val updateLuxtrustFormat = new RootJsonFormat[UpdateLuxtrust] with WriteOnly[UpdateLuxtrust] {
     override def write(obj: UpdateLuxtrust): JsValue = {
       JsObject(
         "$name" -> s"${obj.givenName} ${obj.familyName}".toJson
@@ -29,7 +96,7 @@ object json extends DefaultJsonProtocol {
     }
   }
 
-  implicit val updateIdDataFormat = new RootJsonFormat[UpdateIdData] with ReadOnly[UpdateIdData] {
+  implicit val updateIdDataFormat = new RootJsonFormat[UpdateIdData] with WriteOnly[UpdateIdData] {
     override def write(obj: UpdateIdData): JsValue = {
       JsObject(
         "$name" -> Seq(obj.givenName, obj.familyName).flatten.mkString(" ").toJson
@@ -37,7 +104,7 @@ object json extends DefaultJsonProtocol {
     }
   }
 
-  implicit val updateEmailFormat = new RootJsonFormat[UpdateEmail] with ReadOnly[UpdateEmail] {
+  implicit val updateEmailFormat = new RootJsonFormat[UpdateEmail] with WriteOnly[UpdateEmail] {
     override def write(obj: UpdateEmail): JsValue = {
       JsObject(
         "$email" -> obj.email.toJson
@@ -45,7 +112,7 @@ object json extends DefaultJsonProtocol {
     }
   }
 
-  implicit val updateAddressFormat = new RootJsonFormat[UpdateAddress] with ReadOnly[UpdateAddress] {
+  implicit val updateAddressFormat = new RootJsonFormat[UpdateAddress] with WriteOnly[UpdateAddress] {
     override def write(obj: UpdateAddress): JsValue = {
       JsObject(
         "$address_1" -> obj.address1.toJson,
@@ -58,7 +125,7 @@ object json extends DefaultJsonProtocol {
     }
   }
 
-  implicit val updateNicknameFormat = new RootJsonFormat[UpdateNickname] with ReadOnly[UpdateNickname] {
+  implicit val updateNicknameFormat = new RootJsonFormat[UpdateNickname] with WriteOnly[UpdateNickname] {
     override def write(obj: UpdateNickname): JsValue = {
       JsObject(
         "$user_name" -> obj.nickname.toJson
@@ -66,7 +133,7 @@ object json extends DefaultJsonProtocol {
     }
   }
 
-  implicit val updateCardAccountFormat = new RootJsonFormat[UpdateCardAccount] with ReadOnly[UpdateCardAccount] {
+  implicit val updateCardAccountFormat = new RootJsonFormat[UpdateCardAccount] with WriteOnly[UpdateCardAccount] {
     override def write(obj: UpdateCardAccount): JsValue = {
       JsObject(
         "$payment_type" -> "$credit_card".toJson,
@@ -76,7 +143,7 @@ object json extends DefaultJsonProtocol {
     }
   }
 
-  implicit val updateBankAccountFormat = new RootJsonFormat[UpdateBankAccount] with ReadOnly[UpdateBankAccount] {
+  implicit val updateBankAccountFormat = new RootJsonFormat[UpdateBankAccount] with WriteOnly[UpdateBankAccount] {
     override def write(obj: UpdateBankAccount): JsValue = {
       JsObject(
         "$payment_type" -> "$electronic_fund_transfer".toJson,
@@ -85,7 +152,7 @@ object json extends DefaultJsonProtocol {
     }
   }
 
-  implicit val paymentMethodFormat = new RootJsonFormat[PaymentMethod] with ReadOnly[PaymentMethod] {
+  implicit val paymentMethodFormat = new RootJsonFormat[PaymentMethod] with WriteOnly[PaymentMethod] {
     override def write(obj: PaymentMethod): JsValue = {
       obj match {
         case update: UpdateCardAccount =>
@@ -95,7 +162,7 @@ object json extends DefaultJsonProtocol {
       }
     }
   }
-  implicit val updateAccountFormat = new RootJsonFormat[UpdateSiftAccount] with ReadOnly[UpdateSiftAccount] {
+  implicit val updateAccountFormat = new RootJsonFormat[UpdateSiftAccount] with WriteOnly[UpdateSiftAccount] {
     override def write(obj: UpdateSiftAccount): JsValue = {
       obj match {
         case update: UpdateLuxtrust =>
@@ -116,7 +183,7 @@ object json extends DefaultJsonProtocol {
     }
   }
 
-  implicit val bankDepositFormat = new RootJsonFormat[BankDeposit] with ReadOnly[BankDeposit] {
+  implicit val bankDepositFormat = new RootJsonFormat[BankDeposit] with WriteOnly[BankDeposit] {
     override def write(obj: BankDeposit): JsValue = {
       val micros = Micros.micros(obj.amount)
 
@@ -131,7 +198,7 @@ object json extends DefaultJsonProtocol {
       )
     }
   }
-  implicit val cardDepositFormat = new RootJsonFormat[CardDeposit] with ReadOnly[CardDeposit] {
+  implicit val cardDepositFormat = new RootJsonFormat[CardDeposit] with WriteOnly[CardDeposit] {
     override def write(obj: CardDeposit): JsValue = {
       val micros = Micros.micros(obj.amount)
 
@@ -146,7 +213,7 @@ object json extends DefaultJsonProtocol {
       )
     }
   }
-  implicit val bankwithdrawalformat = new RootJsonFormat[BankWithdrawal] with ReadOnly[BankWithdrawal] {
+  implicit val bankwithdrawalformat = new RootJsonFormat[BankWithdrawal] with WriteOnly[BankWithdrawal] {
     override def write(obj: BankWithdrawal): JsValue = {
       val micros = Micros.micros(obj.amount)
 
@@ -161,7 +228,7 @@ object json extends DefaultJsonProtocol {
       )
     }
   }
-  implicit val sendPaymentFormat = new RootJsonFormat[SendPayment] with ReadOnly[SendPayment] {
+  implicit val sendPaymentFormat = new RootJsonFormat[SendPayment] with WriteOnly[SendPayment] {
     override def write(obj: SendPayment): JsValue = {
       val micros = Micros.micros(obj.amount)
 
@@ -176,7 +243,7 @@ object json extends DefaultJsonProtocol {
       )
     }
   }
-  implicit val receivePaymentFormat = new RootJsonFormat[ReceivePayment] with ReadOnly[ReceivePayment] {
+  implicit val receivePaymentFormat = new RootJsonFormat[ReceivePayment] with WriteOnly[ReceivePayment] {
     override def write(obj: ReceivePayment): JsValue = {
       val micros = Micros.micros(obj.amount)
 
@@ -192,7 +259,7 @@ object json extends DefaultJsonProtocol {
     }
   }
 
-  implicit val transactionFormat = new RootJsonFormat[Transaction] with ReadOnly[Transaction] {
+  implicit val transactionFormat = new RootJsonFormat[Transaction] with WriteOnly[Transaction] {
     override def write(obj: Transaction): JsValue = {
       obj match {
         case tx: BankDeposit =>

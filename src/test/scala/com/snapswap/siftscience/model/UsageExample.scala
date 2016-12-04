@@ -6,7 +6,7 @@ import com.snapswap.siftscience.retry.RetryConfig
 import com.snapswap.siftscience.{SiftscienceClient, SiftscienceClientImpl}
 import org.joda.time.{DateTime, DateTimeZone}
 
-import scala.concurrent.Await
+import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 
 object UsageExample extends App {
@@ -35,7 +35,8 @@ object UsageExample extends App {
     accounts = Seq(bankAccount),
     promotions = Seq(promotion),
     ip = Some("127.0.0.1"),
-    time = new DateTime(DateTimeZone.UTC).getMillis
+    time = new DateTime(DateTimeZone.UTC).getMillis,
+    postCallAction = _ => Future.successful(())
   )
 
   Await.result(request, Duration.Inf)
