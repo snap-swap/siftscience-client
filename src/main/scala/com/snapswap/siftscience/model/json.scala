@@ -128,7 +128,7 @@ object json extends DefaultJsonProtocol {
   implicit val updateNicknameFormat = new RootJsonFormat[UpdateNickname] with WriteOnly[UpdateNickname] {
     override def write(obj: UpdateNickname): JsValue = {
       JsObject(
-        "$user_name" -> obj.nickname.toJson
+        "user_name" -> obj.nickname.toJson
       )
     }
   }

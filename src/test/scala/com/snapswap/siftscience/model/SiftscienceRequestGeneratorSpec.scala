@@ -97,7 +97,7 @@ class SiftscienceRequestGeneratorSpec extends WordSpecLike with Matchers {
 
       result should have size 1
       result should contain {
-        "$user_name" -> "johndoe".toJson
+        "user_name" -> "johndoe".toJson
       }
     }
 
