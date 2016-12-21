@@ -86,40 +86,45 @@ class SiftscienceClientImpl(apiKey: String,
 
   private def delivery(data: Map[String, JsValue], backOffState: Option[ExponentialBackOff] = None)
                       (responseAction: Response => Future[Unit]): Future[Unit] = {
-    send[Response](post(data)) { rawResponse =>
-      rawResponse.parseJson.convertTo[Response]
-    }.flatMap { response =>
-      responseAction(response).recover {
+    for {
+      response <- send[Response](post(data))(_.parseJson.convertTo[Response])
+      _ <- responseAction(response).recover {
         case NonFatal(ex) =>
           log.error(ex, s"Error occurred due to processing response action: ${response.toString}")
       }
-    }.recover {
-      case RetryableError(error) =>
-        log.warning(s"Can't send '$data' to Sift Science because '$error', attempt retry")
+    } yield ()
+  }.recover {
+    case RetryableError(error) =>
+      log.warning(s"Can't send '$data' to Sift Science because '$error', attempt retry")
+      reDelivery(data, backOffState)(responseAction)
+    case FatalError(error) =>
+      log.error(s"Can't resend '${data.toJson.compactPrint}' to Sift Science because error code '${error.status.code}' with message '${error.errorMessage}'")
+    case FeatureIsNotEnabled =>
+      log.warning(s"Request send, but response is 'This feature is not enabled in your feature plan', skip response action")
+    case NonFatal(ex) =>
+      log.error(ex, s"Can't resend '${data.toJson.compactPrint}' to Sift Science because '${ex.getMessage}'")
+  }
 
-        backOffState match {
-          case Some(cfg) =>
-            if (cfg.restartCount > retryConfig.maxAttempts) {
-              log.error(s"After '${retryConfig.maxAttempts} stop send retry")
-            } else {
-              val next = cfg.nextBackOff()
+  private def reDelivery(data: Map[String, JsValue], backOffState: Option[ExponentialBackOff])
+                        (responseAction: Response => Future[Unit]): Unit = {
+    backOffState match {
+      case Some(cfg) =>
+        if (cfg.restartCount > retryConfig.maxAttempts) {
+          log.error(s"After '${retryConfig.maxAttempts} stop send retry")
+        } else {
+          val next = cfg.nextBackOff()
 
-              log.debug(s"Schedule resend event after '${next.calculateDelay.toSeconds}' seconds")
-              system.scheduler.scheduleOnce(next.calculateDelay) {
-                delivery(data, Some(next))(responseAction)
-              }
-            }
-          case None =>
-            val cfg = ExponentialBackOff(retryConfig.minBackoff, retryConfig.maxBackoff, 0.1)
-
-            system.scheduler.scheduleOnce(cfg.calculateDelay) {
-              delivery(data, Some(cfg))(responseAction)
-            }
+          log.debug(s"Schedule resend event after '${next.calculateDelay.toSeconds}' seconds")
+          system.scheduler.scheduleOnce(next.calculateDelay) {
+            delivery(data, Some(next))(responseAction)
+          }
         }
-      case FatalError(error) =>
-        log.error(s"Can't resend '${data.toJson.compactPrint}' to Sift Science because error code '${error.status.code}' with message '${error.errorMessage}'")
-      case NonFatal(ex) =>
-        log.error(ex, s"Can't resend '${data.toJson.compactPrint}' to Sift Science because '${ex.getMessage}'")
+      case None =>
+        val cfg = ExponentialBackOff(retryConfig.minBackoff, retryConfig.maxBackoff, 0.1)
+
+        system.scheduler.scheduleOnce(cfg.calculateDelay) {
+          delivery(data, Some(cfg))(responseAction)
+        }
     }
   }
 
@@ -150,11 +155,7 @@ class SiftscienceClientImpl(apiKey: String,
         Unmarshal(response.entity).to[String].map {
           asString =>
             if (response.status.isSuccess()) {
-              log.debug(s"SUCCESS ${
-                request.method
-              } -> ${
-                response.status
-              } '$asString'")
+              log.debug(s"SUCCESS ${request.method} -> ${response.status} '$asString'")
               asString
             } else {
               if (asString.isEmpty) {

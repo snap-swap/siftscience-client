@@ -5,6 +5,7 @@ object ErrorCodeEnum extends Enumeration {
   val `Server-side timeout processing request` = ErrorCode(-3, "Server-side timeout processing request. Please try again later.")
   val `Unexpected server-side error -1` = ErrorCode(-2, "Unexpected server-side error")
   val `Unexpected server-side error -2` = ErrorCode(-1, "Unexpected server-side error")
+  val `OK` = ErrorCode(0, "OK")
   val `Invalid API key` = ErrorCode(51, "Invalid API key")
   val `Invalid characters in field name` = ErrorCode(52, "Invalid characters in field name")
   val `Invalid characters in field value` = ErrorCode(53, "Invalid characters in field value")

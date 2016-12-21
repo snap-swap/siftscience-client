@@ -18,24 +18,23 @@ object json extends DefaultJsonProtocol {
 
   implicit val AbuseDetailSeqFormat = new RootJsonReader[Seq[AbuseDetail]] {
     override def read(json: JsValue): Seq[AbuseDetail] = {
-
       val reasons = json match {
-        case JsArray(r) =>
-          r
+        case JsArray(array) =>
+          array
         case other =>
           deserializationError(s"Expected array but got: ${other.prettyPrint}")
       }
 
-      reasons.map { r =>
-        val name = (r / "name").convertTo[String]
-        val value = (r / "value").convertTo[String]
-        val details = (r / "details").map(_.prettyPrint)
-
-        (name, value, details) match {
-          case (Some(n), Some(v), d) =>
-            AbuseDetail(n, v, d)
+      reasons.map { reason =>
+        (
+          (reason / "name").convertTo[String],
+          (reason / "value").convertTo[String],
+          (reason / "details").map(_.prettyPrint)
+        ) match {
+          case (Some(name), Some(value), details) =>
+            AbuseDetail(name, value, details)
           case _ =>
-            deserializationError(s"Can't deserialize to AbuseDetail: ${r.prettyPrint}")
+            deserializationError(s"Can't deserialize to AbuseDetail: ${reason.prettyPrint}")
         }
       }
 
@@ -44,14 +43,14 @@ object json extends DefaultJsonProtocol {
 
   implicit val AbuseSeqFormat = new RootJsonReader[Seq[Abuse]] {
     override def read(json: JsValue): Seq[Abuse] = {
-
-      json.asJsObject.fields.toSeq.map { case (name, abuse) =>
-        val score = (abuse / "score").convertTo[BigDecimal]
-        val detail = (abuse / "reasons").convertTo[Seq[AbuseDetail]].getOrElse(Seq.empty)
-
-        (name, score, detail) match {
-          case (n, Some(s), d) =>
-            Abuse(n, s, d)
+      json.asJsObject.fields.toSeq.map { case (abuseName, abuse) =>
+        (
+          abuseName,
+          (abuse / "score").convertTo[BigDecimal],
+          (abuse / "reasons").convertTo[Seq[AbuseDetail]].getOrElse(Seq.empty)
+        ) match {
+          case (name, Some(score), detail) =>
+            Abuse(name, score, detail)
           case _ =>
             deserializationError(s"Can't deserialize to Abuse: ${json.prettyPrint}")
         }
@@ -62,20 +61,22 @@ object json extends DefaultJsonProtocol {
 
   implicit val ResponseFormat = new RootJsonReader[Response] {
     override def read(json: JsValue): Response = {
-
-      val timestamp = (json / "time").convertTo[Long]
-      val userId = (json / "score_response" / "user_id").convertTo[String]
-      val errorCode = (json / "status").convertTo[Int]
-      val errorMessages = (json / "error_message").convertTo[String]
-      val abuses = (json / "score_response" / "scores").convertTo[Seq[Abuse]]
-
-      (timestamp, userId, abuses, errorCode, errorMessages) match {
-        case (Some(t), Some(u), Some(a), Some(err), Some(msg)) if a.nonEmpty =>
-          Response(t, u, a, err, msg)
+      (
+        (json / "time").convertTo[Long],
+        (json / "score_response" / "user_id").convertTo[String],
+        (json / "score_response" / "scores").convertTo[Seq[Abuse]],
+        (json / "status").convertTo[Int],
+        (json / "error_message").convertTo[String],
+        (json / "score_response" / "error_message").convertTo[String],
+        (json / "request").convertTo[String]
+      ) match {
+        case (_, _, _, _, _, Some("This feature is not enabled in your feature plan."), _) =>
+          throw FeatureIsNotEnabled
+        case (Some(timestamp), Some(userId), Some(abuses), Some(errorCode), Some(errorMessages), _, _) if abuses.nonEmpty =>
+          Response(timestamp, userId, abuses, errorCode, errorMessages)
         case _ =>
           deserializationError(s"Can't deserialize to Response: ${json.prettyPrint}")
       }
-
     }
   }
 

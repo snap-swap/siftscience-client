@@ -56,4 +56,16 @@ package object model {
       |    }
       |  }
       |]""".stripMargin
+
+  val featureDisabled =
+    """{
+      |  "status": 0,
+      |  "error_message": "OK",
+      |  "time": 1482226137,
+      |  "request": "{\"$phone\":\"353209111111\",\"$api_key\":\"e94ab48cc94bf95a\",\"$type\":\"$create_account\",\"$name\":\"Samantha Carter\",\"$referrer_user_id\":null,\"account_state\":\"newbie\",\"$ip\":\"127.0.0.1\",\"$session_id\":\"111111112\",\"time\":1482226136736,\"$user_id\":\"011111112\"}",
+      |  "score_response": {
+      |    "status": 111,
+      |    "error_message": "This feature is not enabled in your feature plan."
+      |  }
+      |}""".stripMargin
 }
