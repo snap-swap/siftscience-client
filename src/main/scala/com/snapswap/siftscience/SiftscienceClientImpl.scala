@@ -10,7 +10,7 @@ import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Sink, Source}
 import com.snapswap.siftscience.model._
-import com.snapswap.siftscience.retry.{ExponentialBackOff, RetryConfig}
+import com.snapswap.retry.{RetryableAction, RetryableException}
 import org.joda.time.{DateTime, DateTimeZone}
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -23,8 +23,8 @@ class SiftscienceClientImpl(apiKey: String,
                            (implicit system: ActorSystem, ec: ExecutionContext, materializer: Materializer)
   extends SiftscienceClient with SiftscienceRequestGenerator {
 
-  import spray.json._
   import com.snapswap.siftscience.model.json._
+  import spray.json._
 
   private val log = Logging(system, this.getClass)
   private val baseURL = "/v204/events?return_score=true"
@@ -32,6 +32,28 @@ class SiftscienceClientImpl(apiKey: String,
     Http()
       .outgoingConnectionHttps("api.siftscience.com")
       .log("siftscience")
+
+  private def deliver(delivery: => Future[Unit], actionType: String): Future[Unit] = {
+
+    val whenRetry: (String, RetryableException, Int) => Future[Unit] =
+      (actionName: String, ex: RetryableException, attemptNumber: Int) =>
+        Future(log.warning(s"[$actionName] failed at attempt number $attemptNumber with retryable exception: ${ex.getMessage}, attempt retry"))
+
+    val whenFatal: (String, Throwable, Int) => Future[Unit] =
+      (actionName: String, ex: Throwable, attemptNumber: Int) =>
+        Future(log.error(ex, s"[$actionName] failed at attempt number $attemptNumber with ${ex.getClass.getSimpleName}: ${ex.getMessage}, can't retry"))
+
+    val whenSuccess: (String, Int) => Future[Unit] =
+      (_: String, _: Int) =>
+        Future.successful(())
+
+
+    RetryableAction(delivery, actionType, retryConfig.minBackoff, retryConfig.maxBackoff, retryConfig.maxAttempts, 0.1)(
+      whenRetryAction = whenRetry,
+      whenFatalAction = whenFatal,
+      whenSuccessAction = whenSuccess
+    )
+  }
 
   override def accountCreated(profile: String,
                               clientId: Option[String],
@@ -45,11 +67,13 @@ class SiftscienceClientImpl(apiKey: String,
                               promotions: Seq[Promotion] = Seq.empty[Promotion],
                               time: Long = nowUTC(),
                               postCallAction: Response => Future[Unit]): Future[Unit] = {
-    val common: RequestCommon = RequestCommon("$create_account", apiKey, profile, clientId, profileState, ip, time)
+    val actionType = "$create_account"
+    val common: RequestCommon = RequestCommon(actionType, apiKey, profile, clientId, profileState, ip, time)
 
-    delivery(
-      accountCreatedRequest(common, givenName, familyName, phone, inviter, accounts, promotions)
-    )(postCallAction)
+    deliver(
+      delivery(
+        accountCreatedRequest(common, givenName, familyName, phone, inviter, accounts, promotions)
+      )(postCallAction), actionType)
   }
 
   override def updateAccount(profile: String,
@@ -59,11 +83,13 @@ class SiftscienceClientImpl(apiKey: String,
                              update: UpdateSiftAccount,
                              time: Long = nowUTC(),
                              postCallAction: Response => Future[Unit]): Future[Unit] = {
-    val common: RequestCommon = RequestCommon("$update_account", apiKey, profile, clientId, profileState, ip, time)
+    val actionType = "$update_account"
+    val common: RequestCommon = RequestCommon(actionType, apiKey, profile, clientId, profileState, ip, time)
 
-    delivery(
-      accountUpdateRequest(common, update)
-    )(postCallAction)
+    deliver(
+      delivery(
+        accountUpdateRequest(common, update)
+      )(postCallAction), actionType)
   }
 
   override def transaction(profile: String,
@@ -73,19 +99,20 @@ class SiftscienceClientImpl(apiKey: String,
                            tx: Transaction,
                            time: Long = nowUTC(),
                            postCallAction: Response => Future[Unit]): Future[Unit] = {
-    val common: RequestCommon = RequestCommon("$transaction", apiKey, profile, clientId, profileState, ip, time)
+    val actionType = "$transaction"
+    val common: RequestCommon = RequestCommon(actionType, apiKey, profile, clientId, profileState, ip, time)
 
-    delivery(
-      transactionRequest(common, tx)
-    )(postCallAction)
+    deliver(
+      delivery(
+        transactionRequest(common, tx)
+      )(postCallAction), actionType)
   }
 
   override protected def nowUTC(): Long = {
     new DateTime(DateTimeZone.UTC).getMillis
   }
 
-  private def delivery(data: Map[String, JsValue], backOffState: Option[ExponentialBackOff] = None)
-                      (responseAction: Response => Future[Unit]): Future[Unit] = {
+  private def delivery(data: Map[String, JsValue])(responseAction: Response => Future[Unit]): Future[Unit] = {
     for {
       response <- send[Response](post(data))(_.parseJson.convertTo[Response])
       _ <- responseAction(response).recover {
@@ -94,39 +121,16 @@ class SiftscienceClientImpl(apiKey: String,
       }
     } yield ()
   }.recover {
-    case RetryableError(error) =>
-      log.warning(s"Can't send '$data' to Sift Science because '$error', attempt retry")
-      reDelivery(data, backOffState)(responseAction)
-    case FatalError(error) =>
-      log.error(s"Can't resend '${data.toJson.compactPrint}' to Sift Science because error code '${error.status.code}' with message '${error.errorMessage}'")
+    case RetryableError(error, _) =>
+      throw RetryableError(error, s"Can't send '$data' to Sift Science because '$error', attempt retry")
+    case FatalError(error, _) =>
+      throw FatalError(error, s"Can't resend '${data.toJson.compactPrint}' to Sift Science because error code '${error.status.code}' with message '${error.errorMessage}'")
     case FeatureIsNotEnabled =>
       log.warning(s"Request send, but response is 'This feature is not enabled in your feature plan', skip response action")
     case NonFatal(ex) =>
-      log.error(ex, s"Can't resend '${data.toJson.compactPrint}' to Sift Science because '${ex.getMessage}'")
+      throw NonSiftScienceError(s"Can't resend '${data.toJson.compactPrint}' to Sift Science because '${ex.getMessage}'")
   }
 
-  private def reDelivery(data: Map[String, JsValue], backOffState: Option[ExponentialBackOff])
-                        (responseAction: Response => Future[Unit]): Unit = {
-    backOffState match {
-      case Some(cfg) =>
-        if (cfg.restartCount > retryConfig.maxAttempts) {
-          log.error(s"After '${retryConfig.maxAttempts} stop send retry")
-        } else {
-          val next = cfg.nextBackOff()
-
-          log.debug(s"Schedule resend event after '${next.calculateDelay.toSeconds}' seconds")
-          system.scheduler.scheduleOnce(next.calculateDelay) {
-            delivery(data, Some(next))(responseAction)
-          }
-        }
-      case None =>
-        val cfg = ExponentialBackOff(retryConfig.minBackoff, retryConfig.maxBackoff, 0.1)
-
-        system.scheduler.scheduleOnce(cfg.calculateDelay) {
-          delivery(data, Some(cfg))(responseAction)
-        }
-    }
-  }
 
   private def http(request: HttpRequest): Future[HttpResponse] =
     Source.single(request).via(connectionFlow).runWith(Sink.head)

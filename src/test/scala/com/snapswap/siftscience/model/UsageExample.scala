@@ -2,7 +2,6 @@ package com.snapswap.siftscience.model
 
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
-import com.snapswap.siftscience.retry.RetryConfig
 import com.snapswap.siftscience.{SiftscienceClient, SiftscienceClientImpl}
 import org.joda.time.{DateTime, DateTimeZone}
 

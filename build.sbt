@@ -2,7 +2,7 @@ name := "siftscience-client"
 
 organization := "com.snapswap"
 
-version := "1.0.7"
+version := "1.0.8"
 
 scalaVersion := "2.11.8"
 
@@ -36,7 +36,8 @@ libraryDependencies ++= {
     "joda-time" % "joda-time" % "2.9.4",
     "org.joda" % "joda-convert" % "1.8.1",
     "com.google.code.findbugs" % "jsr305" % "3.0.1" % "provided",
-    "org.scalatest" %% "scalatest" % "3.0.0" % "test"
+    "org.scalatest" %% "scalatest" % "3.0.0" % "test",
+    "com.snapswap" %% "akka-rescheduler" % "1.0.0"
   )
 }
 
