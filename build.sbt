@@ -37,7 +37,7 @@ libraryDependencies ++= {
     "org.joda" % "joda-convert" % "1.8.1",
     "com.google.code.findbugs" % "jsr305" % "3.0.1" % "provided",
     "org.scalatest" %% "scalatest" % "3.0.0" % "test",
-    "com.snapswap" %% "akka-rescheduler" % "1.0.0"
+    "com.snapswap" %% "akka-rescheduler" % "1.0.1"
   )
 }
 

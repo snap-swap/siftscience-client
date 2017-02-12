@@ -10,7 +10,7 @@ import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Sink, Source}
 import com.snapswap.siftscience.model._
-import com.snapswap.retry.{RetryableAction, RetryableException}
+import com.snapswap.retry.{ExponentialBackOff, RetryableAction, RetryableException}
 import org.joda.time.{DateTime, DateTimeZone}
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -48,7 +48,13 @@ class SiftscienceClientImpl(apiKey: String,
         Future.successful(())
 
 
-    RetryableAction(delivery, actionType, retryConfig.minBackoff, retryConfig.maxBackoff, retryConfig.maxAttempts, 0.1)(
+    val retryPolicy = ExponentialBackOff(
+      minBackoff = retryConfig.minBackoff,
+      maxBackoff = retryConfig.maxBackoff,
+      randomFactor = 0.1
+    )
+
+    RetryableAction(delivery, actionType, retryPolicy, retryConfig.maxAttempts)(
       whenRetryAction = whenRetry,
       whenFatalAction = whenFatal,
       whenSuccessAction = whenSuccess
